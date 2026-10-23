@@ -1,0 +1,49 @@
+name: CI_build
+
+on: [push, pull_request]
+
+jobs:
+  build:
+
+    runs-on: windows-latest
+    env:
+      Projectname: TroiaLens
+    strategy:
+      fail-fast: false
+      matrix:
+        build_configuration: [Release]
+        build_platform: [x64]
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v7
+      with:
+          submodules: 'true'
+
+    - name: Add msbuild to PATH
+      uses: microsoft/setup-msbuild@v3
+
+    - name: MSBuild of plugin dll
+      working-directory: .\
+      run: .\build.ps1
+
+    - name: Archive artifacts zip for ${{ matrix.build_platform }}
+      if: matrix.build_configuration == 'Release'
+      uses: actions/upload-artifact@v7
+      with:
+          path: .\out\${{ env.Projectname }}-**-${{ matrix.build_platform }}.zip
+          archive: false
+
+    - name: Archive artifacts msi for ${{ matrix.build_platform }}
+      if: matrix.build_configuration == 'Release'
+      uses: actions/upload-artifact@v7
+      with:
+          path: .\out\${{ env.Projectname }}-**-${{ matrix.build_platform }}.msi
+          archive: false
+
+
+    - name: Create release on tagging
+      uses: softprops/action-gh-release@v3
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+          files: ${{ env.Projectname }}-**-${{ matrix.build_platform }}*
