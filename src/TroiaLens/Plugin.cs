@@ -19,6 +19,15 @@ namespace TroiaLens
         public static readonly FuncItems Funcs = new FuncItems();
 
         private static int _cmdPanel, _cmdAutoOpen, _cmdTabSwitch, _cmdSlideOver, _cmdRowHighlight, _cmdSyntax, _cmdCheckUpdates;
+        // Call tree's parent view: one command per choice, nested in a submenu once Notepad++ is ready.
+        // Names match PARENT_VIEWS in the page's CallTree.tsx
+        private static readonly (string Value, string Label)[] ParentViews =
+        {
+            ("off", "Kapalı"), ("sticky", "Yapışkan başlıklar"), ("guides", "Tıklanır kılavuz çizgileri"), ("jump", "Üste git, geri dön"),
+        };
+        private static readonly int[] _cmdParentView = new int[ParentViews.Length];
+        private static IntPtr _parentViewMenu;
+        private static int _cmdAbout, _cmdShortcuts;
         private static Settings _settings;
         private static string _configDir;
         private static PanelForm _panel;
@@ -76,20 +85,32 @@ namespace TroiaLens
             _settings.Load();
             CleanTemp();
 
-            _cmdPanel = Funcs.Add("TroiaLens paneli", () => Safe(TogglePanel));
-            Funcs.Add("Aktif dosyayı analiz et", () => Safe(AnalyzeCommand));
+            // Default shortcuts are Ctrl+Alt+Shift with a letter or digit, which Notepad++ and the usual plugins leave
+            // free; with a Turkish keyboard Ctrl+Alt is AltGr, which types @, €, ₺ and the like. The Shortcut Mapper
+            // (Plugin commands) changes them; an item's index is its id there, so new commands go at the end.
+            _cmdPanel = Funcs.Add("TroiaLens paneli", () => Safe(TogglePanel), key: ShortcutKey.CtrlAltShift('T'));
+            Funcs.Add("Aktif dosyayı analiz et", () => Safe(AnalyzeCommand), key: ShortcutKey.CtrlAltShift('Y'));
             Funcs.Add("", null);
-            _cmdAutoOpen = Funcs.Add("Trace dosyalarında paneli otomatik aç", () => Safe(ToggleAutoOpen), _settings.AutoOpen);
-            _cmdTabSwitch = Funcs.Add("Sekme değişince yeniden analiz et", () => Safe(ToggleTabSwitch), _settings.AnalyzeOnTabSwitch);
-            _cmdSlideOver = Funcs.Add("Satır ayrıntısını sağda kayan panelde aç", () => Safe(ToggleSlideOver), _settings.DetailSlideOver);
-            _cmdRowHighlight = Funcs.Add("Seçili satırın kod bloğunu renklendir", () => Safe(ToggleRowHighlight), _settings.RowHighlight);
-            _cmdSyntax = Funcs.Add("Sözdizimi renkleri", () => Safe(ToggleSyntax), _settings.SyntaxColors);
+            _cmdAutoOpen = Funcs.Add("Trace dosyalarında paneli otomatik aç", () => Safe(ToggleAutoOpen), _settings.AutoOpen, ShortcutKey.CtrlAltShift('O'));
+            _cmdTabSwitch = Funcs.Add("Sekme değişince yeniden analiz et", () => Safe(ToggleTabSwitch), _settings.AnalyzeOnTabSwitch, ShortcutKey.CtrlAltShift('E'));
+            _cmdSlideOver = Funcs.Add("Satır ayrıntısını sağda kayan panelde aç", () => Safe(ToggleSlideOver), _settings.DetailSlideOver, ShortcutKey.CtrlAltShift('D'));
+            _cmdRowHighlight = Funcs.Add("Seçili satırın kod bloğunu renklendir", () => Safe(ToggleRowHighlight), _settings.RowHighlight, ShortcutKey.CtrlAltShift('V'));
+            _cmdSyntax = Funcs.Add("Sözdizimi renkleri", () => Safe(ToggleSyntax), _settings.SyntaxColors, ShortcutKey.CtrlAltShift('S'));
             Funcs.Add("", null);
             // F12 may not reach the panel: Notepad++ has its own use for it
             if (_settings.DevTools) Funcs.Add("Geliştirici araçları", () => Safe(OpenDevTools));
             Funcs.Add("Güncellemeleri denetle", () => Safe(CheckUpdateCommand));
-            _cmdCheckUpdates = Funcs.Add("Güncellemeleri her gün denetle", () => Safe(ToggleCheckUpdates), _settings.CheckUpdates);
-            Funcs.Add("Hakkında", () => Safe(About));
+            _cmdCheckUpdates = Funcs.Add("Güncellemeleri her gün denetle", () => Safe(ToggleCheckUpdates), _settings.CheckUpdates, ShortcutKey.CtrlAltShift('G'));
+            _cmdAbout = Funcs.Add("Hakkında", () => Safe(About));
+            // Moved under the row highlight item once Notepad++ is ready (NestParentViewMenu); 0 is off, 1-3 the views
+            for (int i = 0; i < ParentViews.Length; i++)
+            {
+                string view = ParentViews[i].Value;
+                _cmdParentView[i] = Funcs.Add("Üst öğe görünümü: " + ParentViews[i].Label, () => Safe(() => SetParentView(view)),
+                    _settings.ParentView == view, ShortcutKey.CtrlAltShift((char)('0' + i)));
+            }
+            // Moved above "Hakkında" once Notepad++ is ready
+            _cmdShortcuts = Funcs.Add("Klavye kısayolları…", () => Safe(ShowShortcuts));
         }
 
         public static void OnNotification(uint code, IntPtr id)
@@ -100,6 +121,7 @@ namespace TroiaLens
                 {
                     case NppMsg.NPPN_READY:
                         _ready = true;
+                        ArrangeMenu();
                         OnBufferActivated(CurrentBufferId());
                         // The other view may show a trace as well
                         PaintSyntaxViews();
@@ -125,6 +147,10 @@ namespace TroiaLens
                         Generations.Remove(id);
                         RecentLineStarts.RemoveAll(r => r.Buffer == id);
                         _panel?.Forget(id);
+                        break;
+                    case NppMsg.NPPN_SHORTCUTREMAPPED:
+                        // Notepad++ has just renamed the item to its long name with the new shortcut
+                        RefreshParentViewMenu();
                         break;
                     case NppMsg.NPPN_SHUTDOWN:
                         // Not saving the settings here: menu changes are saved as they happen, and a hand edit made
@@ -222,6 +248,210 @@ namespace TroiaLens
             if (_markSpan >= 0) DefineMarkStyles();
         }
 
+        /// <summary>From the menu or the call tree's list: saves the choice, marks it in the menu and tells the page.</summary>
+        internal static void SetParentView(string view)
+        {
+            if (Array.IndexOf(Settings.ParentViews, view) < 0) return;
+            _settings.ParentView = view;
+            CheckParentView();
+            _settings.Save();
+            _panel?.SetParentView(view);
+        }
+
+        private static void CheckParentView()
+        {
+            int chosen = Array.FindIndex(ParentViews, v => v.Value == _settings.ParentView);
+            if (_parentViewMenu != IntPtr.Zero)
+                Win32.CheckMenuRadioItem(_parentViewMenu, 0, (uint)ParentViews.Length - 1, (uint)chosen, Win32.MF_BYPOSITION);
+            else
+                for (int i = 0; i < ParentViews.Length; i++) SetCheck(_cmdParentView[i], i == chosen);
+        }
+
+        /// <summary>
+        /// Notepad++ lists a plugin's commands in the order they were added, and that order is their id in
+        /// shortcuts.xml. Commands added later are placed here: the parent view commands move into an "Üst öğe
+        /// görünümü" submenu under the row highlight item, where they stand under their short names and shortcuts,
+        /// and "Klavye kısayolları…" moves above "Hakkında". They keep their command ids, so Notepad++ still runs them.
+        /// </summary>
+        private static void ArrangeMenu()
+        {
+            if (_parentViewMenu != IntPtr.Zero) return;
+            IntPtr ours = OurMenu();
+            if (ours == IntPtr.Zero) return;
+
+            int anchor = MenuPosition(ours, Funcs.CmdId(_cmdRowHighlight));
+            if (anchor >= 0)
+            {
+                IntPtr popup = Win32.CreatePopupMenu();
+                for (int k = 0; k < ParentViews.Length; k++)
+                {
+                    uint id = (uint)Funcs.CmdId(_cmdParentView[k]);
+                    Win32.AppendMenu(popup, Win32.MF_STRING, (UIntPtr)id, ParentViews[k].Label + ShortcutText(id));
+                    Win32.RemoveMenu(ours, id, Win32.MF_BYCOMMAND);
+                }
+                Win32.InsertMenu(ours, (uint)anchor + 1, Win32.MF_BYPOSITION | Win32.MF_POPUP | Win32.MF_STRING, popup, "Üst öğe görünümü");
+                _parentViewMenu = popup;
+                CheckParentView();
+            }
+
+            uint shortcuts = (uint)Funcs.CmdId(_cmdShortcuts);
+            if (Win32.RemoveMenu(ours, shortcuts, Win32.MF_BYCOMMAND))
+            {
+                int about = MenuPosition(ours, Funcs.CmdId(_cmdAbout));
+                Win32.InsertMenu(ours, about >= 0 ? (uint)about : uint.MaxValue, Win32.MF_BYPOSITION | Win32.MF_STRING, (IntPtr)shortcuts,
+                    Funcs.Name(_cmdShortcuts) + ShortcutText(shortcuts));
+            }
+        }
+
+        /// <summary>TroiaLens's own popup under the Plugins menu.</summary>
+        private static IntPtr OurMenu()
+        {
+            IntPtr plugins = Win32.SendMessage(Npp.NppHandle, NppMsg.NPPM_GETMENUHANDLE, (IntPtr)NppMsg.NPPPLUGINMENU, IntPtr.Zero);
+            int panel = Funcs.CmdId(_cmdPanel);
+            if (plugins == IntPtr.Zero || panel == 0) return IntPtr.Zero;
+            for (int i = 0, n = Win32.GetMenuItemCount(plugins); i < n; i++)
+            {
+                IntPtr sub = Win32.GetSubMenu(plugins, i);
+                if (sub != IntPtr.Zero && MenuPosition(sub, panel) >= 0) return sub;
+            }
+            return IntPtr.Zero;
+        }
+
+        private static int MenuPosition(IntPtr menu, int cmdId)
+        {
+            for (int pos = 0, n = Win32.GetMenuItemCount(menu); pos < n; pos++)
+                if (Win32.GetMenuItemID(menu, pos) == (uint)cmdId) return pos;
+            return -1;
+        }
+
+        /// <summary>
+        /// Gives the parent view items their short names back: when a shortcut changes, Notepad++ renames the item
+        /// to the command's full name with the new shortcut.
+        /// </summary>
+        private static void RefreshParentViewMenu()
+        {
+            if (_parentViewMenu == IntPtr.Zero) return;
+            for (int k = 0; k < ParentViews.Length; k++)
+            {
+                uint id = (uint)Funcs.CmdId(_cmdParentView[k]);
+                Win32.ModifyMenu(_parentViewMenu, (uint)k, Win32.MF_BYPOSITION | Win32.MF_STRING, (UIntPtr)id, ParentViews[k].Label + ShortcutText(id));
+            }
+            CheckParentView();
+        }
+
+        // Left open beside Notepad++ (the Shortcut Mapper it opens is modal); one at a time
+        private static ShortcutsForm _shortcutsForm;
+
+        private static void ShowShortcuts()
+        {
+            if (_shortcutsForm == null || _shortcutsForm.IsDisposed)
+            {
+                _shortcutsForm = new ShortcutsForm();
+                _shortcutsForm.Show(new NppWindow());
+            }
+            else _shortcutsForm.Activate();
+        }
+
+        /// <summary>TroiaLens commands with their current shortcuts ("" when none), in the order the menu shows them.</summary>
+        internal static List<(string Name, string Shortcut)> ShortcutList()
+        {
+            var order = new List<int>();
+            for (int i = 0; i < Funcs.Count; i++)
+            {
+                if (!Funcs.IsCommand(i) || Array.IndexOf(_cmdParentView, i) >= 0 || i == _cmdShortcuts) continue;
+                if (i == _cmdAbout) order.Add(_cmdShortcuts);
+                order.Add(i);
+                if (i == _cmdRowHighlight) order.AddRange(_cmdParentView);
+            }
+            return order.ConvertAll(i => (Funcs.Name(i), ShortcutText((uint)Funcs.CmdId(i)).TrimStart('\t')));
+        }
+
+        /// <summary>
+        /// Opens Notepad++'s Shortcut Mapper on its plugin commands tab, filtered to TroiaLens (and the words of
+        /// filter), and returns once it is closed. Notepad++ saves the changes in shortcuts.xml itself and applies
+        /// them at once. The mapper is modal, so a timer turns to the tab after it opens.
+        /// </summary>
+        internal static void OpenShortcutMapper(string filter)
+        {
+            // Every word must match the command's name, its shortcut or the plugin's file name
+            string words = filter.IndexOf(Name, StringComparison.OrdinalIgnoreCase) >= 0 ? filter : (Name + " " + filter).Trim();
+            int tries = 0;
+            using (var timer = new Timer { Interval = 50 })
+            {
+                timer.Tick += (s, e) =>
+                {
+                    if (SetUpShortcutMapper(words) || ++tries > 60) timer.Stop();
+                };
+                timer.Start();
+                Win32.SendMessage(Npp.NppHandle, NppMsg.NPPM_MENUCOMMAND, IntPtr.Zero, (IntPtr)NppMsg.IDM_SETTING_SHORTCUT_MAPPER);
+                timer.Stop();
+            }
+            RefreshParentViewMenu();
+        }
+
+        /// <summary>Finds the open Shortcut Mapper, types the filter and switches to the plugin commands tab.</summary>
+        private static bool SetUpShortcutMapper(string filter)
+        {
+            IntPtr dialog = IntPtr.Zero;
+            Win32.EnumThreadWindows(Win32.GetCurrentThreadId(), (hwnd, _) =>
+            {
+                if (!Win32.IsWindowVisible(hwnd) || Win32.GetDlgItem(hwnd, NppMsg.IDC_BABYGRID_TABBAR) == IntPtr.Zero ||
+                    Win32.GetDlgItem(hwnd, NppMsg.IDC_BABYGRID_FILTER) == IntPtr.Zero) return true;
+                dialog = hwnd;
+                return false;
+            }, IntPtr.Zero);
+            if (dialog == IntPtr.Zero) return false;
+
+            // The filter box re-fills the grid as its text changes
+            Win32.SetWindowText(Win32.GetDlgItem(dialog, NppMsg.IDC_BABYGRID_FILTER), filter);
+            IntPtr tabs = Win32.GetDlgItem(dialog, NppMsg.IDC_BABYGRID_TABBAR);
+            Win32.SendMessage(tabs, Win32.TCM_SETCURSEL, (IntPtr)NppMsg.MapperPluginTab, IntPtr.Zero);
+            // Selecting a tab from code does not notify; the mapper switches its grid on TCN_SELCHANGE
+            var nm = new Win32.NMHDR { hwndFrom = tabs, idFrom = (UIntPtr)NppMsg.IDC_BABYGRID_TABBAR, code = Win32.TCN_SELCHANGE };
+            Win32.SendMessage(dialog, (uint)Win32.WM_NOTIFY, (IntPtr)NppMsg.IDC_BABYGRID_TABBAR, ref nm);
+            return true;
+        }
+
+        /// <summary>The command's shortcut as a menu shows it after a tab, or "" when it has none.</summary>
+        private static string ShortcutText(uint cmdId)
+        {
+            if (!GetShortcut(cmdId, out int packed) || (packed >> 24 & 0xFF) == 0) return "";
+            var sb = new StringBuilder("\t");
+            if ((packed & 0xFF) != 0) sb.Append("Ctrl+");
+            if ((packed >> 8 & 0xFF) != 0) sb.Append("Alt+");
+            if ((packed >> 16 & 0xFF) != 0) sb.Append("Shift+");
+            int key = packed >> 24 & 0xFF;
+            // Letters and digits as typed (Keys names digits D0-D9)
+            if (key >= '0' && key <= '9' || key >= 'A' && key <= 'Z') sb.Append((char)key);
+            else sb.Append(new KeysConverter().ConvertToInvariantString((Keys)key));
+            return sb.ToString();
+        }
+
+        /// <summary>The command's current shortcut, Shortcut Mapper changes included, packed like ShortcutKey.Packed.</summary>
+        private static bool GetShortcut(uint cmdId, out int packed) =>
+            Win32.SendMessage(Npp.NppHandle, NppMsg.NPPM_GETSHORTCUTBYCMDID, (IntPtr)cmdId, out packed) != IntPtr.Zero;
+
+        /// <summary>
+        /// A key pressed in the panel. Notepad++ does not see keys while the page has focus, so a TroiaLens shortcut
+        /// runs from here; everything else stays with the page.
+        /// </summary>
+        internal static bool RunShortcut(Keys keyData)
+        {
+            if (!_ready || (keyData & (Keys.Control | Keys.Alt)) == 0) return false;
+            int pressed = ((keyData & Keys.Control) != 0 ? 1 : 0) | ((keyData & Keys.Alt) != 0 ? 1 : 0) << 8 |
+                          ((keyData & Keys.Shift) != 0 ? 1 : 0) << 16 | (int)(keyData & Keys.KeyCode) << 24;
+            for (int i = 0; i < Funcs.Count; i++)
+            {
+                if (!Funcs.IsCommand(i)) continue;
+                uint id = (uint)Funcs.CmdId(i);
+                if (!GetShortcut(id, out int packed) || packed != pressed) continue;
+                // Through Notepad++, as if chosen from the menu, once the key event is over
+                Win32.PostMessage(Npp.NppHandle, Win32.WM_COMMAND, (IntPtr)id, IntPtr.Zero);
+                return true;
+            }
+            return false;
+        }
+
         private static void OpenDevTools()
         {
             if (!_panelVisible) ShowPanel();
@@ -245,7 +475,7 @@ namespace TroiaLens
             if (_panel == null)
             {
                 string userData = Path.Combine(_configDir, Name, "WebView2");
-                _panel = new PanelForm(Path.Combine(PluginDir, "web"), PluginDir, userData, IsDarkMode(), _settings.DevTools, _settings.DetailSlideOver, _settings.RowHighlight);
+                _panel = new PanelForm(Path.Combine(PluginDir, "web"), PluginDir, userData, IsDarkMode(), _settings.DevTools, _settings.DetailSlideOver, _settings.RowHighlight, _settings.ParentView);
                 RegisterDock(_panel);
                 _panel.Start();
             }
@@ -936,7 +1166,7 @@ namespace TroiaLens
                 : dir;
         }
 
-        private static bool IsDarkMode() =>
+        internal static bool IsDarkMode() =>
             Win32.SendMessage(Npp.NppHandle, NppMsg.NPPM_ISDARKMODEENABLED, IntPtr.Zero, IntPtr.Zero) != IntPtr.Zero;
 
         private static void SetCheck(int index, bool on) =>

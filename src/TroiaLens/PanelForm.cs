@@ -31,6 +31,7 @@ namespace TroiaLens
         private bool _dark;
         private bool _slideOver;
         private bool _rowHighlight;
+        private string _parentView;
         private bool _pageReady;
 
         // Last document message; sent again whenever the page (re)loads
@@ -43,7 +44,7 @@ namespace TroiaLens
         // Open while WebView2 reads it; closed when the panel moves on, so a temporary copy can be deleted
         private Stream _dataStream;
 
-        public PanelForm(string webDir, string loaderDir, string userDataDir, bool dark, bool devTools, bool slideOver, bool rowHighlight)
+        public PanelForm(string webDir, string loaderDir, string userDataDir, bool dark, bool devTools, bool slideOver, bool rowHighlight, string parentView)
         {
             _webDir = webDir;
             _loaderDir = loaderDir;
@@ -52,6 +53,7 @@ namespace TroiaLens
             _dark = dark;
             _slideOver = slideOver;
             _rowHighlight = rowHighlight;
+            _parentView = parentView;
 
             Text = Plugin.Name;
             FormBorderStyle = FormBorderStyle.None;
@@ -59,6 +61,11 @@ namespace TroiaLens
             BackColor = Background(dark);
 
             _web = new WebView2 { Dock = DockStyle.Fill, DefaultBackgroundColor = Background(dark) };
+            // Keys with Ctrl or Alt arrive here while the page has focus; TroiaLens shortcuts run, the rest go on to the page
+            _web.KeyDown += (s, e) =>
+            {
+                if (Plugin.RunShortcut(e.KeyData)) e.Handled = true;
+            };
             Controls.Add(_web);
         }
 
@@ -246,8 +253,18 @@ namespace TroiaLens
             Post(PrefsMessage());
         }
 
+        /// <summary>How the call tree shows a row's parent call.</summary>
+        public void SetParentView(string view)
+        {
+            _parentView = view;
+            Post(PrefsMessage());
+        }
+
         private string PrefsMessage() =>
-            Json.Serialize(new Dictionary<string, object> { ["type"] = "prefs", ["detailSlideOver"] = _slideOver, ["rowHighlight"] = _rowHighlight });
+            Json.Serialize(new Dictionary<string, object>
+            {
+                ["type"] = "prefs", ["detailSlideOver"] = _slideOver, ["rowHighlight"] = _rowHighlight, ["parentView"] = _parentView,
+            });
 
         private void Post(string json)
         {
@@ -298,6 +315,7 @@ namespace TroiaLens
                 case "setPrefs":
                     if (msg.TryGetValue("detailSlideOver", out object slide) && slide is bool on) Plugin.SetDetailSlideOver(on);
                     if (msg.TryGetValue("rowHighlight", out object tint) && tint is bool tinted) Plugin.SetRowHighlight(tinted);
+                    if (msg.TryGetValue("parentView", out object pv) && pv is string view) Plugin.SetParentView(view);
                     break;
                 case "saveCsv":
                     if (msg.TryGetValue("name", out object csvName) && msg.TryGetValue("text", out object csv))

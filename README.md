@@ -54,18 +54,28 @@ Görüntülerdeki veriler örnektir, gerçek değildir.
 
 **Eklentiler > TroiaLens**
 
-| Komut | Ne yapar? |
-|---|---|
-| TroiaLens paneli | Paneli açar veya kapatır |
-| Aktif dosyayı analiz et | Paneli açar ve açık dosyayı yeniden analiz eder. Uzantısı farklı olsa da içeriği trace ise çalışır. |
-| Trace dosyalarında paneli otomatik aç | Trace dosyasına geçince panelin kendiliğinden açılıp açılmayacağını belirler |
-| Sekme değişince yeniden analiz et | Panel açıkken her sekme değişiminde analizi yeniler |
-| Satır ayrıntısını sağda kayan panelde aç | Satır ayrıntısını alt bölme yerine sağdan kayan panelde gösterir |
-| Seçili satırın kod bloğunu renklendir | Panelde seçilen satırın metodunu ve kendisini editörde sarı zeminle gösterir. Çağrı ağacındaki **Blok rengi** kutusuyla aynıdır. |
-| Sözdizimi renkleri | Trace dosyalarının metnini editörde renklendirir; kapatınca renkler kalkar |
-| Güncellemeleri denetle | Releases sayfasında yeni sürüm olup olmadığına bakar; varsa indirip kurar |
-| Güncellemeleri her gün denetle | Notepad++ açılınca günde bir kez yeni sürüme bakılıp bakılmayacağını belirler |
-| Hakkında | Sürümü, trace uzantılarını ve ayar dosyasının yerini gösterir |
+| Komut | Kısayol | Ne yapar? |
+|---|---|---|
+| TroiaLens paneli | Ctrl+Alt+Shift+T | Paneli açar veya kapatır |
+| Aktif dosyayı analiz et | Ctrl+Alt+Shift+Y | Paneli açar ve açık dosyayı yeniden analiz eder. Uzantısı farklı olsa da içeriği trace ise çalışır. |
+| Trace dosyalarında paneli otomatik aç | Ctrl+Alt+Shift+O | Trace dosyasına geçince panelin kendiliğinden açılıp açılmayacağını belirler |
+| Sekme değişince yeniden analiz et | Ctrl+Alt+Shift+E | Panel açıkken her sekme değişiminde analizi yeniler |
+| Satır ayrıntısını sağda kayan panelde aç | Ctrl+Alt+Shift+D | Satır ayrıntısını alt bölme yerine sağdan kayan panelde gösterir |
+| Seçili satırın kod bloğunu renklendir | Ctrl+Alt+Shift+V | Panelde seçilen satırın metodunu ve kendisini editörde sarı zeminle gösterir. Çağrı ağacındaki **Blok rengi** kutusuyla aynıdır. |
+| Üst öğe görünümü | Ctrl+Alt+Shift+0 … 3 | Çağrı ağacında satırın bağlı olduğu üst çağrının nasıl gösterileceği: **Kapalı** (0), **Yapışkan başlıklar** (1), **Tıklanır kılavuz çizgileri** (2), **Üste git, geri dön** (3). Çağrı ağacındaki **Üst öğe** listesiyle aynıdır. |
+| Sözdizimi renkleri | Ctrl+Alt+Shift+S | Trace dosyalarının metnini editörde renklendirir; kapatınca renkler kalkar |
+| Güncellemeleri denetle | | Releases sayfasında yeni sürüm olup olmadığına bakar; varsa indirip kurar |
+| Güncellemeleri her gün denetle | Ctrl+Alt+Shift+G | Notepad++ açılınca günde bir kez yeni sürüme bakılıp bakılmayacağını belirler |
+| Klavye kısayolları… | | TroiaLens komutlarını kısayollarıyla listeler. **Değiştir…** seçili komutu Notepad++'ın Kısayol Düzenleyicisi'nde açar. |
+| Hakkında | | Sürümü, trace uzantılarını ve ayar dosyasının yerini gösterir |
+
+Kısayollar panel odaktayken de çalışır. Değiştirmek ya da boş olanlara kısayol atamak için **Klavye kısayolları…**
+penceresini ya da **Ayarlar > Kısayol Düzenleyici > Eklenti Komutları** sekmesini kullanın. Değişiklik hemen
+geçerli olur; Notepad++ onu kendi `shortcuts.xml` dosyasına kaydeder. Eklenti kısayollarını çalışırken yalnızca
+Notepad++'ın Kısayol Düzenleyicisi değiştirebilir; dosyayı elle düzenlemeyin.
+
+Varsayılanlar Ctrl+Alt+Shift ile başlar: Notepad++ ve yaygın eklentiler bu tuşları kullanmaz. Türkçe klavyede
+Ctrl+Alt, AltGr ile aynıdır (@, €, ₺ gibi karakterler); Shift eklenince çakışmaz.
 
 ## Ayarlar
 
@@ -79,6 +89,7 @@ Notepad++ yeniden başlayınca geçerli olur.
 | `AnalyzeOnTabSwitch` | `1` | Panel açıkken her sekme değişiminde analizi yenile |
 | `DetailSlideOver` | `0` | `1` ise satır ayrıntısı sağdan kayan panelde açılır |
 | `RowHighlight` | `1` | Panelde seçilen satırın metodunu ve kendisini editörde sarı zeminle göster |
+| `ParentView` | `sticky` | Çağrı ağacında üst çağrının gösterimi: `off`, `sticky` (yapışkan başlıklar), `guides` (tıklanır kılavuz çizgileri), `jump` (üste git, geri dön) |
 | `SyntaxColors` | `1` | Trace dosyalarının metnini editörde renklendir |
 | `Extensions` | `.trace` | Trace sayılan uzantılar; birden fazlaysa `;` ile ayrılır |
 | `CheckUpdates` | `1` | Notepad++ açılınca günde bir kez yeni sürüme bak. Kapatmak için `0` yapın ya da menüdeki işareti kaldırın |

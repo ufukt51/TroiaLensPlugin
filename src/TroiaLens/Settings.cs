@@ -30,6 +30,11 @@ namespace TroiaLens
         /// <summary>Tint the selected row's method and the row itself in the editor; off, only the margin bar and word boxes show.</summary>
         public bool RowHighlight { get; set; } = true;
 
+        /// <summary>How the call tree shows a row's parent call: off, sticky, guides or jump.</summary>
+        public string ParentView { get; set; } = "sticky";
+
+        public static readonly string[] ParentViews = { "off", "sticky", "guides", "jump" };
+
         /// <summary>Colour the text of trace documents in the editor.</summary>
         public bool SyntaxColors { get; set; } = true;
 
@@ -53,6 +58,8 @@ namespace TroiaLens
             DevTools = Read("DevTools", DevTools);
             DetailSlideOver = Read("DetailSlideOver", DetailSlideOver);
             RowHighlight = Read("RowHighlight", RowHighlight);
+            string view = Read("ParentView", ParentView).Trim().ToLowerInvariant();
+            if (ParentViews.Contains(view)) ParentView = view;
             SyntaxColors = Read("SyntaxColors", SyntaxColors);
             CheckUpdates = Read("CheckUpdates", CheckUpdates);
             SkippedVersion = Read("SkippedVersion", SkippedVersion).Trim();
@@ -69,6 +76,7 @@ namespace TroiaLens
             {
                 WriteIfMissing("CheckUpdates", CheckUpdates ? "1" : "0");
                 WriteIfMissing("RowHighlight", RowHighlight ? "1" : "0");
+                WriteIfMissing("ParentView", ParentView);
             }
         }
 
@@ -81,6 +89,7 @@ namespace TroiaLens
                 Write("AnalyzeOnTabSwitch", AnalyzeOnTabSwitch ? "1" : "0");
                 Write("DetailSlideOver", DetailSlideOver ? "1" : "0");
                 Write("RowHighlight", RowHighlight ? "1" : "0");
+                Write("ParentView", ParentView);
                 Write("SyntaxColors", SyntaxColors ? "1" : "0");
                 Write("CheckUpdates", CheckUpdates ? "1" : "0");
                 Write("SkippedVersion", SkippedVersion);

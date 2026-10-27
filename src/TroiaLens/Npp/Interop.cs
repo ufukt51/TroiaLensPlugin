@@ -68,6 +68,8 @@ namespace TroiaLens.Npp
 
         public const uint NPPM_GETCURRENTSCINTILLA = NPPMSG + 4;
         public const uint NPPM_GETCURRENTDOCINDEX = NPPMSG + 23;
+        public const uint NPPM_GETMENUHANDLE = NPPMSG + 25;
+        public const int NPPPLUGINMENU = 0;
         public const uint NPPM_DMMSHOW = NPPMSG + 30;
         public const uint NPPM_DMMHIDE = NPPMSG + 31;
         public const uint NPPM_DMMREGASDCKDLG = NPPMSG + 33;
@@ -80,11 +82,21 @@ namespace TroiaLens.Npp
         public const uint NPPM_GETCURRENTBUFFERID = NPPMSG + 60;
         public const uint NPPM_GETBUFFERENCODING = NPPMSG + 66;
         public const uint NPPM_ISDARKMODEENABLED = NPPMSG + 107;
+        public const uint NPPM_GETSHORTCUTBYCMDID = NPPMSG + 76;
+        public const uint NPPM_MENUCOMMAND = NPPMSG + 48;
+        public const uint NPPM_GETDARKMODECOLORS = NPPMSG + 108;
         public const uint NPPM_ALLOCATEINDICATOR = NPPMSG + 113;
         public const uint NPPM_GETFULLCURRENTPATH = RUNCOMMAND_USER + 1;
 
         // Menu command ids (menuCmdID.h): IDM_FILE = IDM + 1000, IDM = 40000
         public const int IDM_FILE_EXIT = 41000 + 11;
+        // IDM_SETTING = IDM + 8000
+        public const int IDM_SETTING_SHORTCUT_MAPPER = 48000 + 9;
+
+        // Shortcut Mapper dialog (ShortcutMapper_rc.h): its tab bar, its filter box and the plugin commands tab
+        public const int IDC_BABYGRID_TABBAR = 2604;
+        public const int IDC_BABYGRID_FILTER = 2608;
+        public const int MapperPluginTab = 3;
 
         private const uint NPPN_FIRST = 1000;
         public const uint NPPN_READY = NPPN_FIRST + 1;
@@ -94,6 +106,7 @@ namespace TroiaLens.Npp
         public const uint NPPN_BUFFERACTIVATED = NPPN_FIRST + 10;
         public const uint NPPN_WORDSTYLESUPDATED = NPPN_FIRST + 12;
         public const uint NPPN_DARKMODECHANGED = NPPN_FIRST + 27;
+        public const uint NPPN_SHORTCUTREMAPPED = NPPN_FIRST + 13;
 
         // Docking.h
         public const uint DWS_ICONTAB = 0x00000001;
@@ -209,6 +222,82 @@ namespace TroiaLens.Npp
 
         [DllImport("user32.dll")]
         public static extern IntPtr SetFocus(IntPtr hWnd);
+
+        public const uint MF_STRING = 0x0000;
+        public const uint MF_POPUP = 0x0010;
+        public const uint MF_BYCOMMAND = 0x0000;
+        public const uint MF_BYPOSITION = 0x0400;
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr CreatePopupMenu();
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        public static extern bool AppendMenu(IntPtr hMenu, uint flags, UIntPtr id, string text);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        public static extern bool InsertMenu(IntPtr hMenu, uint position, uint flags, IntPtr idOrPopup, string text);
+
+        [DllImport("user32.dll")]
+        public static extern bool RemoveMenu(IntPtr hMenu, uint position, uint flags);
+
+        [DllImport("user32.dll")]
+        public static extern int GetMenuItemCount(IntPtr hMenu);
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetSubMenu(IntPtr hMenu, int position);
+
+        [DllImport("user32.dll")]
+        public static extern uint GetMenuItemID(IntPtr hMenu, int position);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        public static extern bool ModifyMenu(IntPtr hMenu, uint position, uint flags, UIntPtr id, string text);
+
+        public const uint TCM_SETCURSEL = 0x130C;
+        public const int TCN_SELCHANGE = -551;
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct NMHDR
+        {
+            public IntPtr hwndFrom;
+            public UIntPtr idFrom;
+            public int code;
+        }
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr SendMessage(IntPtr hWnd, uint msg, IntPtr wParam, ref NMHDR lParam);
+
+        public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        public static extern bool EnumThreadWindows(uint threadId, EnumWindowsProc callback, IntPtr lParam);
+
+        [DllImport("kernel32.dll")]
+        public static extern uint GetCurrentThreadId();
+
+        [DllImport("user32.dll")]
+        public static extern bool IsWindowVisible(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr SendMessage(IntPtr hWnd, uint msg, IntPtr wParam, int[] lParam);
+
+        public const uint LVM_GETHEADER = 0x101F;
+
+        [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)]
+        public static extern int SetWindowTheme(IntPtr hWnd, string appName, string idList);
+
+        public const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+
+        [DllImport("dwmapi.dll")]
+        public static extern int DwmSetWindowAttribute(IntPtr hWnd, int attribute, ref int value, int size);
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetDlgItem(IntPtr hDlg, int id);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        public static extern bool SetWindowText(IntPtr hWnd, string text);
+
+        [DllImport("user32.dll")]
+        public static extern bool CheckMenuRadioItem(IntPtr hMenu, uint first, uint last, uint check, uint flags);
 
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
         public static extern int GetPrivateProfileString(string section, string key, string def, StringBuilder value, int size, string file);
