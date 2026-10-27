@@ -147,6 +147,15 @@ namespace TroiaLens
                         Generations.Remove(id);
                         RecentLineStarts.RemoveAll(r => r.Buffer == id);
                         _panel?.Forget(id);
+                        Dismissed.Remove(id);
+                        // Closing the last tab opens a new empty document without announcing it, so the panel would
+                        // keep showing the closed trace. No trace in front after a close: the panel closes as well,
+                        // however it was opened; it opens again on a trace when it opens automatically.
+                        if (_ready && _panelVisible)
+                        {
+                            if (IsTraceDocument()) OnBufferActivated(CurrentBufferId());
+                            else HidePanel();
+                        }
                         break;
                     case NppMsg.NPPN_SHORTCUTREMAPPED:
                         // Notepad++ has just renamed the item to its long name with the new shortcut
