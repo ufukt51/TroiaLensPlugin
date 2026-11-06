@@ -11,3 +11,4 @@ web/
 *.min.js
 *.generated.*
 out/
+.claude/
