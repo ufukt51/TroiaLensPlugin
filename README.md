@@ -37,6 +37,8 @@ Görüntülerdeki veriler örnektir, gerçek değildir.
 - Çağrı ağacında bir satır seçtiğinizde, satırın ait olduğu metot editörde açık sarıyla, satırın kendisi koyu sarıyla
   işaretlenir. Bu zemin renklerini menüden ya da Çağrı ağacındaki **Blok rengi** kutusundan kapatabilirsiniz;
   kapalıyken metodun yalnızca soldaki çubuğu ve metot adının çerçevesi kalır.
+- Çağrı ağacında satırın sağındaki kopyala düğmesi ya da seçili satırda Ctrl+C, metodun veya bloğun (IF, LOOP, SWITCH)
+  dosyadaki tüm satırlarını panoya kopyalar.
 - Editörde bir kelimeye çift tıkladığınızda, kelime dosyada geçtiği her yerde pembeyle işaretlenir. Aynı kelimeye
   yeniden çift tıklarsanız işaret kalkar.
 - Satır ayrıntısı alt bölmede açılır. Ayrıntı başlığındaki düğmeyle ya da menüden sağdan kayan panele geçebilirsiniz;

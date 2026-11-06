@@ -139,6 +139,7 @@ namespace TroiaLens.Npp
         public const uint SCI_GETFIRSTVISIBLELINE = 2152;
         public const uint SCI_GETLINECOUNT = 2154;
         public const uint SCI_GETMODIFY = 2159;
+        public const uint SCI_COPYRANGE = 2419;
         public const uint SCI_GETTARGETSTART = 2191;
         public const uint SCI_GETTARGETEND = 2193;
         public const uint SCI_SEARCHINTARGET = 2197;

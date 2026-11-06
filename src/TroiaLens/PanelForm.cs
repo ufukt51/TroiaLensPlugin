@@ -302,6 +302,9 @@ namespace TroiaLens
                 case "mark":
                     Plugin.Mark(Int(msg, "from"), Int(msg, "to"), Int(msg, "line"), Int(msg, "lineEnd"), msg.TryGetValue("word", out object word) ? word as string : null);
                     break;
+                case "copyLines":
+                    Plugin.CopyLines(Int(msg, "from"), Int(msg, "to"));
+                    break;
                 case "clearMarks":
                     Plugin.ClearMarks();
                     break;

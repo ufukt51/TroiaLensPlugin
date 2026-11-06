@@ -822,13 +822,7 @@ namespace TroiaLens
         {
             Safe(() =>
             {
-                if (_lineStarts == null || _lineStarts.Length == 0) return;
-                if (CurrentBufferId() != _docBuffer)
-                {
-                    if (string.IsNullOrEmpty(_docPath)) return;
-                    Win32.SendMessage(Npp.NppHandle, NppMsg.NPPM_SWITCHTOFILE, IntPtr.Zero, _docPath);
-                    if (CurrentBufferId() != _docBuffer) return;
-                }
+                if (!ActivateDoc()) return;
 
                 IntPtr sci = CurrentScintilla();
                 long pos = TracePos(sci, line);
@@ -846,6 +840,28 @@ namespace TroiaLens
                     Win32.SetFocus(sci);
                 }
             });
+        }
+
+        /// <summary>Copies 1-based trace lines from..to of the analysed document to the clipboard.</summary>
+        public static void CopyLines(int from, int to)
+        {
+            Safe(() =>
+            {
+                if (!ActivateDoc()) return;
+                IntPtr sci = CurrentScintilla();
+                Sci(sci, SciMsg.SCI_COPYRANGE, Sci(sci, SciMsg.SCI_POSITIONFROMLINE, (IntPtr)DocLine(sci, from)),
+                    Sci(sci, SciMsg.SCI_GETLINEENDPOSITION, (IntPtr)DocLineEnd(sci, to)));
+            });
+        }
+
+        /// <summary>Brings the analysed document to the front; false if it has no lines or cannot be reached.</summary>
+        private static bool ActivateDoc()
+        {
+            if (_lineStarts == null || _lineStarts.Length == 0) return false;
+            if (CurrentBufferId() == _docBuffer) return true;
+            if (string.IsNullOrEmpty(_docPath)) return false;
+            Win32.SendMessage(Npp.NppHandle, NppMsg.NPPM_SWITCHTOFILE, IntPtr.Zero, _docPath);
+            return CurrentBufferId() == _docBuffer;
         }
 
         /// <summary>Reports caret moves in the analysed document so the call tree can select the matching row.</summary>
