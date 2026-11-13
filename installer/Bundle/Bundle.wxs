@@ -56,7 +56,8 @@
     <util:RegistrySearch Id="NodeRegSearch" Variable="NodeRegPath" Root="HKLM" Key="SOFTWARE\Node.js" Value="InstallPath" Bitness="always64" />
     <util:FileSearch Id="NodeExeSearch" Variable="NodeExeExists" Path="[ProgramFiles64Folder]nodejs\node.exe" Result="exists" />
 
-    <Chain>
+    <!-- A few plugin files need no system restore point; Burn's own one takes 20-30 s -->
+    <Chain DisableSystemRestore="yes">
       <PackageGroupRef Id="NetFx48Web" />
 
       <ExePackage Id="WebView2Runtime"

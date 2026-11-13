@@ -116,6 +116,12 @@ namespace TroiaLens
                 return;
             }
             if (answer != DialogResult.Yes) return;
+            // An earlier "skip" must not hide this version at startup if the install does not go through
+            if (_settings.SkippedVersion == latest)
+            {
+                _settings.SkippedVersion = "";
+                _settings.Save();
+            }
 
             _updateBusy = true;
             Task.Run(() => Download(release)).ContinueWith(t => _ui.BeginInvoke((Action)(() => Safe(() =>
@@ -145,10 +151,14 @@ namespace TroiaLens
             string exe = Process.GetCurrentProcess().MainModule.FileName;
             // The setup finds Notepad++ itself; a portable copy is only known from here
             string nppDir = Path.GetDirectoryName(exe);
+            string dll = typeof(Plugin).Assembly.Location;
             var script = new StringBuilder()
                 .AppendLine($"Wait-Process -Id {Process.GetCurrentProcess().Id} -ErrorAction SilentlyContinue")
                 // Node.js is a first-install option; an update leaves it as the user chose then
-                .AppendLine($"Start-Process -FilePath {Quote(setup)} -ArgumentList '/passive', {Quote("NPPDIR=\"" + nppDir + "\"")}, 'InstallNode=0' -Wait")
+                .AppendLine($"$p = Start-Process -FilePath {Quote(setup)} -ArgumentList '/passive', {Quote("NPPDIR=\"" + nppDir + "\"")}, 'InstallNode=0' -Wait -PassThru")
+                // Plugins Admin may have put an older zip over this MSI version; the setup then sees it installed and copies nothing
+                .AppendLine($"if ($p.ExitCode -eq 0 -and [Version](Get-Item {Quote(dll)}).VersionInfo.FileVersion -lt [Version]'{version}') " +
+                            $"{{ Start-Process -FilePath {Quote(setup)} -ArgumentList '/repair', '/passive' -Wait }}")
                 .AppendLine(now ? $"Start-Process -FilePath {Quote(exe)}" : "")
                 .ToString();
             Process.Start(new ProcessStartInfo("powershell.exe",
