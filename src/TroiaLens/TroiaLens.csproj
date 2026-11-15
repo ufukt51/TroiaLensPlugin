@@ -12,7 +12,7 @@
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
-    <Version>0.1.4.5</Version>
+    <Version>0.1.4.6</Version>
     <Product>TroiaLens</Product>
     <Description>Canias ERP Troia trace analizi için Notepad++ eklentisi</Description>
     <!-- The IL round trip that adds native exports drops debug info anyway -->
@@ -26,7 +26,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4258.31" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
   </ItemGroup>
 
   <!--
@@ -34,12 +34,7 @@
     methods marked [DllExport] get an ".export" directive and it is reassembled for x64.
     The stamp file keeps an already processed assembly from being processed twice.
   -->
-  <Target Name="ExportNativeEntryPoints"
-          AfterTargets="CoreCompile"
-          BeforeTargets="CopyFilesToOutputDirectory"
-          Inputs="@(IntermediateAssembly)"
-          Outputs="@(IntermediateAssembly->'%(FullPath).exports')"
-          Condition="'$(DesignTimeBuild)' != 'true' and '$(SkipCompilerExecution)' != 'true' and Exists('@(IntermediateAssembly)')">
+  <Target Name="ExportNativeEntryPoints" AfterTargets="CoreCompile" BeforeTargets="CopyFilesToOutputDirectory" Inputs="@(IntermediateAssembly)" Outputs="@(IntermediateAssembly->'%(FullPath).exports')" Condition="'$(DesignTimeBuild)' != 'true' and '$(SkipCompilerExecution)' != 'true' and Exists('@(IntermediateAssembly)')">
     <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)..\..\tools\DllExport.ps1&quot; -Assembly &quot;@(IntermediateAssembly->'%(FullPath)')&quot;" />
     <Touch Files="@(IntermediateAssembly->'%(FullPath).exports')" AlwaysCreate="true" />
   </Target>

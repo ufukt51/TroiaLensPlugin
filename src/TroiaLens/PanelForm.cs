@@ -20,6 +20,8 @@ namespace TroiaLens
     {
         private const string AppHost = "troialens.local";
         private const string DataHost = "troialens-data.local";
+        // WebView2 holds a whole response in Notepad++'s memory: one stream of a 1.4 GB trace ran it out of memory
+        private const int DataChunk = 8 << 20;
 
         private static readonly JavaScriptSerializer Json = new JavaScriptSerializer { MaxJsonLength = int.MaxValue };
 
@@ -36,13 +38,11 @@ namespace TroiaLens
 
         // Last document message; sent again whenever the page (re)loads
         private string _state;
-        // Trace file the page streams from https://troialens-data.local/<name>?v=<token>, served by OnDataRequested:
+        // Trace file the page streams from https://troialens-data.local/<name>?v=<token>, served in chunks by OnDataRequested:
         // the saved document itself, or a temporary copy (deleted when the panel moves on). Nothing of it stays in memory.
         private string _dataPath;
         private string _dataToken;
         private bool _dataTemp;
-        // Open while WebView2 reads it; closed when the panel moves on, so a temporary copy can be deleted
-        private Stream _dataStream;
 
         public PanelForm(string webDir, string loaderDir, string userDataDir, bool dark, bool devTools, bool slideOver, bool rowHighlight, string parentView)
         {
@@ -160,21 +160,30 @@ namespace TroiaLens
 
         private static string DocKey(IntPtr doc) => doc.ToInt64().ToString(System.Globalization.CultureInfo.InvariantCulture);
 
-        /// <summary>The data host serves the shown file, streamed from disk; an older request finds nothing.</summary>
+        /// <summary>
+        /// The data host serves the shown file from disk, DataChunk bytes from ?at=&lt;offset&gt; per request; an empty
+        /// body is the end. An older request finds nothing.
+        /// </summary>
         private void OnDataRequested(object sender, CoreWebView2WebResourceRequestedEventArgs e)
         {
             CoreWebView2Environment env = _web.CoreWebView2.Environment;
             string path = _dataPath;
-            if (path != null && e.Request.Uri.EndsWith("?v=" + _dataToken, StringComparison.Ordinal))
+            // ...?v=<token>&at=<offset>, the offset added by the page
+            var query = System.Text.RegularExpressions.Regex.Match(e.Request.Uri, @"\?v=(\w+)&at=(\d+)$");
+            if (path != null && query.Success && query.Groups[1].Value == _dataToken && long.TryParse(query.Groups[2].Value, out long at))
             {
                 try
                 {
                     // Others may write or delete the file meanwhile: Notepad++ saving it, DropData removing a copy
-                    var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 1 << 16, FileOptions.SequentialScan);
-                    // The page reloaded and asks again
-                    _dataStream?.Dispose();
-                    _dataStream = stream;
-                    e.Response = env.CreateWebResourceResponse(stream, 200, "OK", DataHeaders($"Content-Type: text/plain\r\nContent-Length: {stream.Length}"));
+                    using (var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                    {
+                        var chunk = new byte[Math.Max(0, Math.Min(DataChunk, file.Length - at))];
+                        file.Position = Math.Min(at, file.Length);
+                        int n = 0, read;
+                        while (n < chunk.Length && (read = file.Read(chunk, n, chunk.Length - n)) > 0) n += read;
+                        e.Response = env.CreateWebResourceResponse(new MemoryStream(chunk, 0, n), 200, "OK",
+                            DataHeaders($"Content-Type: application/octet-stream\r\nContent-Length: {n}"));
+                    }
                     return;
                 }
                 catch (Exception)
@@ -191,9 +200,6 @@ namespace TroiaLens
 
         private void DropData()
         {
-            // A read still going belongs to a load the page drops anyway
-            _dataStream?.Dispose();
-            _dataStream = null;
             if (_dataTemp && _dataPath != null)
             {
                 try
